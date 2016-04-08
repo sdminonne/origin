@@ -18,6 +18,8 @@ import (
 	routeapiv1 "github.com/openshift/origin/pkg/route/api/v1"
 	sdnapi "github.com/openshift/origin/pkg/sdn/api"
 	sdnapiv1 "github.com/openshift/origin/pkg/sdn/api/v1"
+	securityapi "github.com/openshift/origin/pkg/security/api"
+	securityapiv1 "github.com/openshift/origin/pkg/security/api/v1"
 	templateapi "github.com/openshift/origin/pkg/template/api"
 	templateapiv1 "github.com/openshift/origin/pkg/template/api/v1"
 	userapi "github.com/openshift/origin/pkg/user/api"
@@ -5864,6 +5866,330 @@ func Convert_v1_NetNamespaceList_To_api_NetNamespaceList(in *sdnapiv1.NetNamespa
 	return autoConvert_v1_NetNamespaceList_To_api_NetNamespaceList(in, out, s)
 }
 
+func autoConvert_api_PodSpecReview_To_v1_PodSpecReview(in *securityapi.PodSpecReview, out *securityapiv1.PodSpecReview, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*securityapi.PodSpecReview))(in)
+	}
+	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := batchv1.Convert_api_PodSpec_To_v1_PodSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_api_PodSpecReviewStatus_To_v1_PodSpecReviewStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_api_PodSpecReview_To_v1_PodSpecReview(in *securityapi.PodSpecReview, out *securityapiv1.PodSpecReview, s conversion.Scope) error {
+	return autoConvert_api_PodSpecReview_To_v1_PodSpecReview(in, out, s)
+}
+
+func autoConvert_api_PodSpecReviewResult_To_v1_PodSpecReviewResult(in *securityapi.PodSpecReviewResult, out *securityapiv1.PodSpecReviewResult, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*securityapi.PodSpecReviewResult))(in)
+	}
+	if err := batchv1.Convert_api_PodSpec_To_v1_PodSpec(&in.PodSpec, &out.PodSpec, s); err != nil {
+		return err
+	}
+	if err := Convert_api_ObjectReference_To_v1_ObjectReference(&in.DefaultedBy, &out.DefaultedBy, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_api_PodSpecReviewResult_To_v1_PodSpecReviewResult(in *securityapi.PodSpecReviewResult, out *securityapiv1.PodSpecReviewResult, s conversion.Scope) error {
+	return autoConvert_api_PodSpecReviewResult_To_v1_PodSpecReviewResult(in, out, s)
+}
+
+func autoConvert_api_PodSpecReviewStatus_To_v1_PodSpecReviewStatus(in *securityapi.PodSpecReviewStatus, out *securityapiv1.PodSpecReviewStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*securityapi.PodSpecReviewStatus))(in)
+	}
+	if in.AllowedServiceAccounts != nil {
+		out.AllowedServiceAccounts = make(map[string]securityapiv1.PodSpecReviewResult)
+		for key, val := range in.AllowedServiceAccounts {
+			newVal := securityapiv1.PodSpecReviewResult{}
+			if err := Convert_api_PodSpecReviewResult_To_v1_PodSpecReviewResult(&val, &newVal, s); err != nil {
+				return err
+			}
+			out.AllowedServiceAccounts[key] = newVal
+		}
+	} else {
+		out.AllowedServiceAccounts = nil
+	}
+	return nil
+}
+
+func Convert_api_PodSpecReviewStatus_To_v1_PodSpecReviewStatus(in *securityapi.PodSpecReviewStatus, out *securityapiv1.PodSpecReviewStatus, s conversion.Scope) error {
+	return autoConvert_api_PodSpecReviewStatus_To_v1_PodSpecReviewStatus(in, out, s)
+}
+
+func autoConvert_api_PodSpecSelfSubjectReview_To_v1_PodSpecSelfSubjectReview(in *securityapi.PodSpecSelfSubjectReview, out *securityapiv1.PodSpecSelfSubjectReview, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*securityapi.PodSpecSelfSubjectReview))(in)
+	}
+	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_api_PodSpecSelfSubjectReviewSpec_To_v1_PodSpecSelfSubjectReviewSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_api_PodSpecSubjectReviewStatus_To_v1_PodSpecSubjectReviewStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_api_PodSpecSelfSubjectReview_To_v1_PodSpecSelfSubjectReview(in *securityapi.PodSpecSelfSubjectReview, out *securityapiv1.PodSpecSelfSubjectReview, s conversion.Scope) error {
+	return autoConvert_api_PodSpecSelfSubjectReview_To_v1_PodSpecSelfSubjectReview(in, out, s)
+}
+
+func autoConvert_api_PodSpecSelfSubjectReviewSpec_To_v1_PodSpecSelfSubjectReviewSpec(in *securityapi.PodSpecSelfSubjectReviewSpec, out *securityapiv1.PodSpecSelfSubjectReviewSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*securityapi.PodSpecSelfSubjectReviewSpec))(in)
+	}
+	if err := batchv1.Convert_api_PodSpec_To_v1_PodSpec(&in.PodSpec, &out.PodSpec, s); err != nil {
+		return err
+	}
+	out.ExcludeSelf = in.ExcludeSelf
+	return nil
+}
+
+func Convert_api_PodSpecSelfSubjectReviewSpec_To_v1_PodSpecSelfSubjectReviewSpec(in *securityapi.PodSpecSelfSubjectReviewSpec, out *securityapiv1.PodSpecSelfSubjectReviewSpec, s conversion.Scope) error {
+	return autoConvert_api_PodSpecSelfSubjectReviewSpec_To_v1_PodSpecSelfSubjectReviewSpec(in, out, s)
+}
+
+func autoConvert_api_PodSpecSubjectReview_To_v1_PodSpecSubjectReview(in *securityapi.PodSpecSubjectReview, out *securityapiv1.PodSpecSubjectReview, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*securityapi.PodSpecSubjectReview))(in)
+	}
+	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_api_PodSpecSubjectReviewSpec_To_v1_PodSpecSubjectReviewSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_api_PodSpecSubjectReviewStatus_To_v1_PodSpecSubjectReviewStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_api_PodSpecSubjectReview_To_v1_PodSpecSubjectReview(in *securityapi.PodSpecSubjectReview, out *securityapiv1.PodSpecSubjectReview, s conversion.Scope) error {
+	return autoConvert_api_PodSpecSubjectReview_To_v1_PodSpecSubjectReview(in, out, s)
+}
+
+func autoConvert_api_PodSpecSubjectReviewSpec_To_v1_PodSpecSubjectReviewSpec(in *securityapi.PodSpecSubjectReviewSpec, out *securityapiv1.PodSpecSubjectReviewSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*securityapi.PodSpecSubjectReviewSpec))(in)
+	}
+	if err := batchv1.Convert_api_PodSpec_To_v1_PodSpec(&in.PodSpec, &out.PodSpec, s); err != nil {
+		return err
+	}
+	out.User = in.User
+	if in.Groups != nil {
+		out.Groups = make([]string, len(in.Groups))
+		for i := range in.Groups {
+			out.Groups[i] = in.Groups[i]
+		}
+	} else {
+		out.Groups = nil
+	}
+	return nil
+}
+
+func Convert_api_PodSpecSubjectReviewSpec_To_v1_PodSpecSubjectReviewSpec(in *securityapi.PodSpecSubjectReviewSpec, out *securityapiv1.PodSpecSubjectReviewSpec, s conversion.Scope) error {
+	return autoConvert_api_PodSpecSubjectReviewSpec_To_v1_PodSpecSubjectReviewSpec(in, out, s)
+}
+
+func autoConvert_api_PodSpecSubjectReviewStatus_To_v1_PodSpecSubjectReviewStatus(in *securityapi.PodSpecSubjectReviewStatus, out *securityapiv1.PodSpecSubjectReviewStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*securityapi.PodSpecSubjectReviewStatus))(in)
+	}
+	// unable to generate simple pointer conversion for api.ObjectReference -> v1.ObjectReference
+	if in.AllowedBy != nil {
+		out.AllowedBy = new(apiv1.ObjectReference)
+		if err := Convert_api_ObjectReference_To_v1_ObjectReference(in.AllowedBy, out.AllowedBy, s); err != nil {
+			return err
+		}
+	} else {
+		out.AllowedBy = nil
+	}
+	out.Reason = in.Reason
+	if err := batchv1.Convert_api_PodSpec_To_v1_PodSpec(&in.PodSpec, &out.PodSpec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_api_PodSpecSubjectReviewStatus_To_v1_PodSpecSubjectReviewStatus(in *securityapi.PodSpecSubjectReviewStatus, out *securityapiv1.PodSpecSubjectReviewStatus, s conversion.Scope) error {
+	return autoConvert_api_PodSpecSubjectReviewStatus_To_v1_PodSpecSubjectReviewStatus(in, out, s)
+}
+
+func autoConvert_v1_PodSpecReview_To_api_PodSpecReview(in *securityapiv1.PodSpecReview, out *securityapi.PodSpecReview, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*securityapiv1.PodSpecReview))(in)
+	}
+	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := batchv1.Convert_v1_PodSpec_To_api_PodSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_v1_PodSpecReviewStatus_To_api_PodSpecReviewStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1_PodSpecReview_To_api_PodSpecReview(in *securityapiv1.PodSpecReview, out *securityapi.PodSpecReview, s conversion.Scope) error {
+	return autoConvert_v1_PodSpecReview_To_api_PodSpecReview(in, out, s)
+}
+
+func autoConvert_v1_PodSpecReviewResult_To_api_PodSpecReviewResult(in *securityapiv1.PodSpecReviewResult, out *securityapi.PodSpecReviewResult, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*securityapiv1.PodSpecReviewResult))(in)
+	}
+	if err := batchv1.Convert_v1_PodSpec_To_api_PodSpec(&in.PodSpec, &out.PodSpec, s); err != nil {
+		return err
+	}
+	if err := Convert_v1_ObjectReference_To_api_ObjectReference(&in.DefaultedBy, &out.DefaultedBy, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1_PodSpecReviewResult_To_api_PodSpecReviewResult(in *securityapiv1.PodSpecReviewResult, out *securityapi.PodSpecReviewResult, s conversion.Scope) error {
+	return autoConvert_v1_PodSpecReviewResult_To_api_PodSpecReviewResult(in, out, s)
+}
+
+func autoConvert_v1_PodSpecReviewStatus_To_api_PodSpecReviewStatus(in *securityapiv1.PodSpecReviewStatus, out *securityapi.PodSpecReviewStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*securityapiv1.PodSpecReviewStatus))(in)
+	}
+	if in.AllowedServiceAccounts != nil {
+		out.AllowedServiceAccounts = make(map[string]securityapi.PodSpecReviewResult)
+		for key, val := range in.AllowedServiceAccounts {
+			newVal := securityapi.PodSpecReviewResult{}
+			if err := Convert_v1_PodSpecReviewResult_To_api_PodSpecReviewResult(&val, &newVal, s); err != nil {
+				return err
+			}
+			out.AllowedServiceAccounts[key] = newVal
+		}
+	} else {
+		out.AllowedServiceAccounts = nil
+	}
+	return nil
+}
+
+func Convert_v1_PodSpecReviewStatus_To_api_PodSpecReviewStatus(in *securityapiv1.PodSpecReviewStatus, out *securityapi.PodSpecReviewStatus, s conversion.Scope) error {
+	return autoConvert_v1_PodSpecReviewStatus_To_api_PodSpecReviewStatus(in, out, s)
+}
+
+func autoConvert_v1_PodSpecSelfSubjectReview_To_api_PodSpecSelfSubjectReview(in *securityapiv1.PodSpecSelfSubjectReview, out *securityapi.PodSpecSelfSubjectReview, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*securityapiv1.PodSpecSelfSubjectReview))(in)
+	}
+	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_v1_PodSpecSelfSubjectReviewSpec_To_api_PodSpecSelfSubjectReviewSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_v1_PodSpecSubjectReviewStatus_To_api_PodSpecSubjectReviewStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1_PodSpecSelfSubjectReview_To_api_PodSpecSelfSubjectReview(in *securityapiv1.PodSpecSelfSubjectReview, out *securityapi.PodSpecSelfSubjectReview, s conversion.Scope) error {
+	return autoConvert_v1_PodSpecSelfSubjectReview_To_api_PodSpecSelfSubjectReview(in, out, s)
+}
+
+func autoConvert_v1_PodSpecSelfSubjectReviewSpec_To_api_PodSpecSelfSubjectReviewSpec(in *securityapiv1.PodSpecSelfSubjectReviewSpec, out *securityapi.PodSpecSelfSubjectReviewSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*securityapiv1.PodSpecSelfSubjectReviewSpec))(in)
+	}
+	if err := batchv1.Convert_v1_PodSpec_To_api_PodSpec(&in.PodSpec, &out.PodSpec, s); err != nil {
+		return err
+	}
+	out.ExcludeSelf = in.ExcludeSelf
+	return nil
+}
+
+func Convert_v1_PodSpecSelfSubjectReviewSpec_To_api_PodSpecSelfSubjectReviewSpec(in *securityapiv1.PodSpecSelfSubjectReviewSpec, out *securityapi.PodSpecSelfSubjectReviewSpec, s conversion.Scope) error {
+	return autoConvert_v1_PodSpecSelfSubjectReviewSpec_To_api_PodSpecSelfSubjectReviewSpec(in, out, s)
+}
+
+func autoConvert_v1_PodSpecSubjectReview_To_api_PodSpecSubjectReview(in *securityapiv1.PodSpecSubjectReview, out *securityapi.PodSpecSubjectReview, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*securityapiv1.PodSpecSubjectReview))(in)
+	}
+	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_v1_PodSpecSubjectReviewSpec_To_api_PodSpecSubjectReviewSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_v1_PodSpecSubjectReviewStatus_To_api_PodSpecSubjectReviewStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1_PodSpecSubjectReview_To_api_PodSpecSubjectReview(in *securityapiv1.PodSpecSubjectReview, out *securityapi.PodSpecSubjectReview, s conversion.Scope) error {
+	return autoConvert_v1_PodSpecSubjectReview_To_api_PodSpecSubjectReview(in, out, s)
+}
+
+func autoConvert_v1_PodSpecSubjectReviewSpec_To_api_PodSpecSubjectReviewSpec(in *securityapiv1.PodSpecSubjectReviewSpec, out *securityapi.PodSpecSubjectReviewSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*securityapiv1.PodSpecSubjectReviewSpec))(in)
+	}
+	if err := batchv1.Convert_v1_PodSpec_To_api_PodSpec(&in.PodSpec, &out.PodSpec, s); err != nil {
+		return err
+	}
+	out.User = in.User
+	if in.Groups != nil {
+		out.Groups = make([]string, len(in.Groups))
+		for i := range in.Groups {
+			out.Groups[i] = in.Groups[i]
+		}
+	} else {
+		out.Groups = nil
+	}
+	return nil
+}
+
+func Convert_v1_PodSpecSubjectReviewSpec_To_api_PodSpecSubjectReviewSpec(in *securityapiv1.PodSpecSubjectReviewSpec, out *securityapi.PodSpecSubjectReviewSpec, s conversion.Scope) error {
+	return autoConvert_v1_PodSpecSubjectReviewSpec_To_api_PodSpecSubjectReviewSpec(in, out, s)
+}
+
+func autoConvert_v1_PodSpecSubjectReviewStatus_To_api_PodSpecSubjectReviewStatus(in *securityapiv1.PodSpecSubjectReviewStatus, out *securityapi.PodSpecSubjectReviewStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*securityapiv1.PodSpecSubjectReviewStatus))(in)
+	}
+	// unable to generate simple pointer conversion for v1.ObjectReference -> api.ObjectReference
+	if in.AllowedBy != nil {
+		out.AllowedBy = new(api.ObjectReference)
+		if err := Convert_v1_ObjectReference_To_api_ObjectReference(in.AllowedBy, out.AllowedBy, s); err != nil {
+			return err
+		}
+	} else {
+		out.AllowedBy = nil
+	}
+	out.Reason = in.Reason
+	if err := batchv1.Convert_v1_PodSpec_To_api_PodSpec(&in.PodSpec, &out.PodSpec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1_PodSpecSubjectReviewStatus_To_api_PodSpecSubjectReviewStatus(in *securityapiv1.PodSpecSubjectReviewStatus, out *securityapi.PodSpecSubjectReviewStatus, s conversion.Scope) error {
+	return autoConvert_v1_PodSpecSubjectReviewStatus_To_api_PodSpecSubjectReviewStatus(in, out, s)
+}
+
 func autoConvert_api_Parameter_To_v1_Parameter(in *templateapi.Parameter, out *templateapiv1.Parameter, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*templateapi.Parameter))(in)
@@ -8996,6 +9322,14 @@ func init() {
 		autoConvert_api_ObjectReference_To_v1_ObjectReference,
 		autoConvert_api_Parameter_To_v1_Parameter,
 		autoConvert_api_PersistentVolumeClaimVolumeSource_To_v1_PersistentVolumeClaimVolumeSource,
+		autoConvert_api_PodSpecReviewResult_To_v1_PodSpecReviewResult,
+		autoConvert_api_PodSpecReviewStatus_To_v1_PodSpecReviewStatus,
+		autoConvert_api_PodSpecReview_To_v1_PodSpecReview,
+		autoConvert_api_PodSpecSelfSubjectReviewSpec_To_v1_PodSpecSelfSubjectReviewSpec,
+		autoConvert_api_PodSpecSelfSubjectReview_To_v1_PodSpecSelfSubjectReview,
+		autoConvert_api_PodSpecSubjectReviewSpec_To_v1_PodSpecSubjectReviewSpec,
+		autoConvert_api_PodSpecSubjectReviewStatus_To_v1_PodSpecSubjectReviewStatus,
+		autoConvert_api_PodSpecSubjectReview_To_v1_PodSpecSubjectReview,
 		autoConvert_api_PodSpec_To_v1_PodSpec,
 		autoConvert_api_PodTemplateSpec_To_v1_PodTemplateSpec,
 		autoConvert_api_PolicyBindingList_To_v1_PolicyBindingList,
@@ -9175,6 +9509,14 @@ func init() {
 		autoConvert_v1_ObjectReference_To_api_ObjectReference,
 		autoConvert_v1_Parameter_To_api_Parameter,
 		autoConvert_v1_PersistentVolumeClaimVolumeSource_To_api_PersistentVolumeClaimVolumeSource,
+		autoConvert_v1_PodSpecReviewResult_To_api_PodSpecReviewResult,
+		autoConvert_v1_PodSpecReviewStatus_To_api_PodSpecReviewStatus,
+		autoConvert_v1_PodSpecReview_To_api_PodSpecReview,
+		autoConvert_v1_PodSpecSelfSubjectReviewSpec_To_api_PodSpecSelfSubjectReviewSpec,
+		autoConvert_v1_PodSpecSelfSubjectReview_To_api_PodSpecSelfSubjectReview,
+		autoConvert_v1_PodSpecSubjectReviewSpec_To_api_PodSpecSubjectReviewSpec,
+		autoConvert_v1_PodSpecSubjectReviewStatus_To_api_PodSpecSubjectReviewStatus,
+		autoConvert_v1_PodSpecSubjectReview_To_api_PodSpecSubjectReview,
 		autoConvert_v1_PodSpec_To_api_PodSpec,
 		autoConvert_v1_PodTemplateSpec_To_api_PodTemplateSpec,
 		autoConvert_v1_PolicyBindingList_To_api_PolicyBindingList,

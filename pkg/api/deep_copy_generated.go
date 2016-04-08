@@ -10,6 +10,7 @@ import (
 	projectapi "github.com/openshift/origin/pkg/project/api"
 	routeapi "github.com/openshift/origin/pkg/route/api"
 	sdnapi "github.com/openshift/origin/pkg/sdn/api"
+	securityapi "github.com/openshift/origin/pkg/security/api"
 	templateapi "github.com/openshift/origin/pkg/template/api"
 	userapi "github.com/openshift/origin/pkg/user/api"
 	pkgapi "k8s.io/kubernetes/pkg/api"
@@ -3021,6 +3022,145 @@ func deepCopy_api_NetNamespaceList(in sdnapi.NetNamespaceList, out *sdnapi.NetNa
 	return nil
 }
 
+func deepCopy_api_PodSpecReview(in securityapi.PodSpecReview, out *securityapi.PodSpecReview, c *conversion.Cloner) error {
+	if newVal, err := c.DeepCopy(in.TypeMeta); err != nil {
+		return err
+	} else {
+		out.TypeMeta = newVal.(unversioned.TypeMeta)
+	}
+	if newVal, err := c.DeepCopy(in.ObjectMeta); err != nil {
+		return err
+	} else {
+		out.ObjectMeta = newVal.(pkgapi.ObjectMeta)
+	}
+	if newVal, err := c.DeepCopy(in.Spec); err != nil {
+		return err
+	} else {
+		out.Spec = newVal.(pkgapi.PodSpec)
+	}
+	if err := deepCopy_api_PodSpecReviewStatus(in.Status, &out.Status, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_api_PodSpecReviewResult(in securityapi.PodSpecReviewResult, out *securityapi.PodSpecReviewResult, c *conversion.Cloner) error {
+	if newVal, err := c.DeepCopy(in.PodSpec); err != nil {
+		return err
+	} else {
+		out.PodSpec = newVal.(pkgapi.PodSpec)
+	}
+	if newVal, err := c.DeepCopy(in.DefaultedBy); err != nil {
+		return err
+	} else {
+		out.DefaultedBy = newVal.(pkgapi.ObjectReference)
+	}
+	return nil
+}
+
+func deepCopy_api_PodSpecReviewStatus(in securityapi.PodSpecReviewStatus, out *securityapi.PodSpecReviewStatus, c *conversion.Cloner) error {
+	if in.AllowedServiceAccounts != nil {
+		out.AllowedServiceAccounts = make(map[string]securityapi.PodSpecReviewResult)
+		for key, val := range in.AllowedServiceAccounts {
+			newVal := new(securityapi.PodSpecReviewResult)
+			if err := deepCopy_api_PodSpecReviewResult(val, newVal, c); err != nil {
+				return err
+			}
+			out.AllowedServiceAccounts[key] = *newVal
+		}
+	} else {
+		out.AllowedServiceAccounts = nil
+	}
+	return nil
+}
+
+func deepCopy_api_PodSpecSelfSubjectReview(in securityapi.PodSpecSelfSubjectReview, out *securityapi.PodSpecSelfSubjectReview, c *conversion.Cloner) error {
+	if newVal, err := c.DeepCopy(in.TypeMeta); err != nil {
+		return err
+	} else {
+		out.TypeMeta = newVal.(unversioned.TypeMeta)
+	}
+	if newVal, err := c.DeepCopy(in.ObjectMeta); err != nil {
+		return err
+	} else {
+		out.ObjectMeta = newVal.(pkgapi.ObjectMeta)
+	}
+	if err := deepCopy_api_PodSpecSelfSubjectReviewSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_PodSpecSubjectReviewStatus(in.Status, &out.Status, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_api_PodSpecSelfSubjectReviewSpec(in securityapi.PodSpecSelfSubjectReviewSpec, out *securityapi.PodSpecSelfSubjectReviewSpec, c *conversion.Cloner) error {
+	if newVal, err := c.DeepCopy(in.PodSpec); err != nil {
+		return err
+	} else {
+		out.PodSpec = newVal.(pkgapi.PodSpec)
+	}
+	out.ExcludeSelf = in.ExcludeSelf
+	return nil
+}
+
+func deepCopy_api_PodSpecSubjectReview(in securityapi.PodSpecSubjectReview, out *securityapi.PodSpecSubjectReview, c *conversion.Cloner) error {
+	if newVal, err := c.DeepCopy(in.TypeMeta); err != nil {
+		return err
+	} else {
+		out.TypeMeta = newVal.(unversioned.TypeMeta)
+	}
+	if newVal, err := c.DeepCopy(in.ObjectMeta); err != nil {
+		return err
+	} else {
+		out.ObjectMeta = newVal.(pkgapi.ObjectMeta)
+	}
+	if err := deepCopy_api_PodSpecSubjectReviewSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_PodSpecSubjectReviewStatus(in.Status, &out.Status, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_api_PodSpecSubjectReviewSpec(in securityapi.PodSpecSubjectReviewSpec, out *securityapi.PodSpecSubjectReviewSpec, c *conversion.Cloner) error {
+	if newVal, err := c.DeepCopy(in.PodSpec); err != nil {
+		return err
+	} else {
+		out.PodSpec = newVal.(pkgapi.PodSpec)
+	}
+	out.User = in.User
+	if in.Groups != nil {
+		out.Groups = make([]string, len(in.Groups))
+		for i := range in.Groups {
+			out.Groups[i] = in.Groups[i]
+		}
+	} else {
+		out.Groups = nil
+	}
+	return nil
+}
+
+func deepCopy_api_PodSpecSubjectReviewStatus(in securityapi.PodSpecSubjectReviewStatus, out *securityapi.PodSpecSubjectReviewStatus, c *conversion.Cloner) error {
+	if in.AllowedBy != nil {
+		if newVal, err := c.DeepCopy(in.AllowedBy); err != nil {
+			return err
+		} else {
+			out.AllowedBy = newVal.(*pkgapi.ObjectReference)
+		}
+	} else {
+		out.AllowedBy = nil
+	}
+	out.Reason = in.Reason
+	if newVal, err := c.DeepCopy(in.PodSpec); err != nil {
+		return err
+	} else {
+		out.PodSpec = newVal.(pkgapi.PodSpec)
+	}
+	return nil
+}
+
 func deepCopy_api_Parameter(in templateapi.Parameter, out *templateapi.Parameter, c *conversion.Cloner) error {
 	out.Name = in.Name
 	out.DisplayName = in.DisplayName
@@ -3410,6 +3550,14 @@ func init() {
 		deepCopy_api_HostSubnetList,
 		deepCopy_api_NetNamespace,
 		deepCopy_api_NetNamespaceList,
+		deepCopy_api_PodSpecReview,
+		deepCopy_api_PodSpecReviewResult,
+		deepCopy_api_PodSpecReviewStatus,
+		deepCopy_api_PodSpecSelfSubjectReview,
+		deepCopy_api_PodSpecSelfSubjectReviewSpec,
+		deepCopy_api_PodSpecSubjectReview,
+		deepCopy_api_PodSpecSubjectReviewSpec,
+		deepCopy_api_PodSpecSubjectReviewStatus,
 		deepCopy_api_Parameter,
 		deepCopy_api_Template,
 		deepCopy_api_TemplateList,
