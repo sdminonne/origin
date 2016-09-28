@@ -278,19 +278,19 @@ func TestSpecificSAs(t *testing.T) {
 				},
 			},
 			serviceAccounts: []*kapi.ServiceAccount{
-				&kapi.ServiceAccount{
+				{
 					ObjectMeta: kapi.ObjectMeta{
 						Name:      "my-sa",
 						Namespace: "default",
 					},
 				},
-				&kapi.ServiceAccount{
+				{
 					ObjectMeta: kapi.ObjectMeta{
 						Name:      "yours-sa",
 						Namespace: "default",
 					},
 				},
-				&kapi.ServiceAccount{
+				{
 					ObjectMeta: kapi.ObjectMeta{
 						Name:      "our-sa",
 						Namespace: "default",
@@ -342,7 +342,7 @@ func TestSpecificSAs(t *testing.T) {
 				},
 			},
 			serviceAccounts: []*kapi.ServiceAccount{
-				&kapi.ServiceAccount{
+				{
 					ObjectMeta: kapi.ObjectMeta{
 						Name:      "my-sa",
 						Namespace: "default",
