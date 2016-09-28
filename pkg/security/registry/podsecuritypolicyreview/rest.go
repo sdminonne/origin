@@ -43,20 +43,20 @@ func (r *REST) Create(ctx kapi.Context, obj runtime.Object) (runtime.Object, err
 		return nil, kapierrors.NewBadRequest(fmt.Sprintf("not a PodSecurityPolicyReview: %#v", obj))
 	}
 	if errs := securityvalidation.ValidatePodSecurityPolicyReview(pspr); len(errs) > 0 {
-		return nil, kapierrors.NewInvalid(securityapi.Kind(pspr.Kind), "", errs)
+		return nil, kapierrors.NewInvalid(kapi.Kind("podsecuritypolicyreview"), "", errs)
 	}
 	ns, ok := kapi.NamespaceFrom(ctx)
 	if !ok {
-		return pspr, kapierrors.NewBadRequest("namespace parameter required.")
+		return nil, kapierrors.NewBadRequest("namespace parameter required.")
 	}
 	serviceAccounts, err := getServiceAccounts(pspr.Spec, r.client, ns)
 	if err != nil {
-		return pspr, err
+		return nil, err
 	}
 
 	if len(serviceAccounts) == 0 {
 		glog.Errorf("No service accounts for namespace %s", ns)
-		return pspr, nil
+		return nil, kapierrors.NewBadRequest(fmt.Sprintf("no a ServiceAccount for namespace: %s", ns))
 	}
 
 	errs := []error{}
@@ -65,7 +65,7 @@ func (r *REST) Create(ctx kapi.Context, obj runtime.Object) (runtime.Object, err
 		userInfo := serviceaccount.UserInfo(ns, sa.Name, "")
 		saConstraints, err := r.sccMatcher.FindApplicableSCCs(userInfo)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("error finding SCC for ServiceAccount %s: %v", sa.Name, err))
+			errs = append(errs, fmt.Errorf("unable to find SecurityContextConstraints for ServiceAccount %s: %v", sa.Name, err))
 			continue
 		}
 		oscc.DeduplicateSecurityContextConstraints(saConstraints)
@@ -78,7 +78,7 @@ func (r *REST) Create(ctx kapi.Context, obj runtime.Object) (runtime.Object, err
 			)
 			pspsrs := securityapi.PodSecurityPolicySubjectReviewStatus{}
 			if provider, namespace, err = oscc.CreateProviderFromConstraint(ns, namespace, constraint, r.client); err != nil {
-				errs = append(errs, fmt.Errorf("unable to create provider provider for service account %s: %v", sa.Name, err))
+				errs = append(errs, fmt.Errorf("unable to create provider for service account %s: %v", sa.Name, err))
 				continue
 			}
 			_, err = podsecuritypolicysubjectreview.FillPodSecurityPolicySubjectReviewStatus(&pspsrs, provider, pspr.Spec.Template.Spec, constraint)
@@ -92,7 +92,7 @@ func (r *REST) Create(ctx kapi.Context, obj runtime.Object) (runtime.Object, err
 
 	}
 	if len(errs) > 0 {
-		return pspr, kerrors.NewAggregate(errs)
+		return nil, kerrors.NewAggregate(errs)
 	}
 	pspr.Status = newStatus
 	return pspr, nil

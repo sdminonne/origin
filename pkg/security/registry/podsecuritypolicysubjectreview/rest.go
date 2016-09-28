@@ -49,7 +49,7 @@ func (r *REST) Create(ctx kapi.Context, obj runtime.Object) (runtime.Object, err
 	}
 
 	if errs := securityvalidation.ValidatePodSecurityPolicySubjectReview(pspsr); len(errs) > 0 {
-		return nil, kapierrors.NewInvalid(securityapi.Kind(pspsr.Kind), "", errs)
+		return nil, kapierrors.NewInvalid(kapi.Kind("podsecuritypolicysubjectreview"), "", errs)
 	}
 
 	userInfo := &user.DefaultInfo{Name: pspsr.Spec.User, Groups: pspsr.Spec.Groups}
@@ -91,19 +91,19 @@ func (r *REST) Create(ctx kapi.Context, obj runtime.Object) (runtime.Object, err
 	return pspsr, nil
 }
 
-// FillPodSecurityPolicySubjectReviewStatus fills PodSecurityPolicySubjectReviewStatus
+// FillPodSecurityPolicySubjectReviewStatus fills PodSecurityPolicySubjectReviewStatus assigning SecurityContectConstraint to the PodSpec
 func FillPodSecurityPolicySubjectReviewStatus(s *securityapi.PodSecurityPolicySubjectReviewStatus, provider kscc.SecurityContextConstraintsProvider, spec kapi.PodSpec, constraint *kapi.SecurityContextConstraints) (bool, error) {
 	pod := &kapi.Pod{
 		Spec: spec,
 	}
 	if errs := oscc.AssignSecurityContext(provider, pod, field.NewPath(fmt.Sprintf("provider %s: ", provider.GetSCCName()))); len(errs) > 0 {
 		glog.Errorf("unable to assign SecurityContextConstraints provider: %v", errs)
-		//TODO: fills s.Reason
+		s.Reason = "CantAssignSecurityContextConstraintProvider"
 		return false, fmt.Errorf("unable to assign SecurityContextConstraints provider: %v", errs.ToAggregate())
 	}
 	ref, err := kapi.GetReference(constraint)
 	if err != nil {
-		//TODO: fills s.Reason
+		s.Reason = "CantObtainReference"
 		return false, fmt.Errorf("unable to get SecurityContextConstraints reference: %v", err)
 	}
 	s.AllowedBy = ref

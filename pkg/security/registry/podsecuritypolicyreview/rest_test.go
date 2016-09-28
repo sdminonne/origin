@@ -6,7 +6,9 @@ import (
 
 	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	clientsetfake "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/runtime"
 
 	oscache "github.com/openshift/origin/pkg/client/cache"
 	admissionttesting "github.com/openshift/origin/pkg/security/admission/testing"
@@ -15,6 +17,7 @@ import (
 )
 
 func TestNoErrors(t *testing.T) {
+	var uid int64 = 999
 	testcases := map[string]struct {
 		request    *securityapi.PodSecurityPolicyReview
 		sccs       []*kapi.SecurityContextConstraints
@@ -57,6 +60,64 @@ func TestNoErrors(t *testing.T) {
 			},
 			allowedSAs: []string{"default"},
 		},
+		"failure creating provider": {
+			request: &securityapi.PodSecurityPolicyReview{
+				Spec: securityapi.PodSecurityPolicyReviewSpec{
+					Template: kapi.PodTemplateSpec{
+						Spec: kapi.PodSpec{
+							Containers: []kapi.Container{
+								{
+									Name:            "ctr",
+									Image:           "image",
+									ImagePullPolicy: "IfNotPresent",
+									SecurityContext: &kapi.SecurityContext{
+										Capabilities: &kapi.Capabilities{
+											Add: []kapi.Capability{"foo"},
+										},
+									},
+								},
+							},
+							RestartPolicy:      kapi.RestartPolicyAlways,
+							SecurityContext:    &kapi.PodSecurityContext{},
+							DNSPolicy:          kapi.DNSClusterFirst,
+							ServiceAccountName: "default",
+						},
+					},
+				},
+			},
+			sccs: []*kapi.SecurityContextConstraints{
+				{
+					ObjectMeta: kapi.ObjectMeta{
+						SelfLink: "/api/version/securitycontextconstraints/restrictive",
+						Name:     "restrictive",
+					},
+					RunAsUser: kapi.RunAsUserStrategyOptions{
+						Type: kapi.RunAsUserStrategyMustRunAs,
+						UID:  &uid,
+					},
+					SELinuxContext: kapi.SELinuxContextStrategyOptions{
+						Type: kapi.SELinuxStrategyMustRunAs,
+						SELinuxOptions: &kapi.SELinuxOptions{
+							Level: "s9:z0,z1",
+						},
+					},
+					FSGroup: kapi.FSGroupStrategyOptions{
+						Type: kapi.FSGroupStrategyMustRunAs,
+						Ranges: []kapi.IDRange{
+							{Min: 999, Max: 999},
+						},
+					},
+					SupplementalGroups: kapi.SupplementalGroupsStrategyOptions{
+						Type: kapi.SupplementalGroupsStrategyMustRunAs,
+						Ranges: []kapi.IDRange{
+							{Min: 999, Max: 999},
+						},
+					},
+					Groups: []string{"system:serviceaccounts"},
+				},
+			},
+			allowedSAs: nil,
+		},
 	}
 
 	for testName, testcase := range testcases {
@@ -91,6 +152,235 @@ func TestNoErrors(t *testing.T) {
 		}
 		if !reflect.DeepEqual(allowedSas, testcase.allowedSAs) {
 			t.Errorf("%s - expected allowed ServiceAccout names %v got %v", testName, testcase.allowedSAs, allowedSas)
+		}
+	}
+}
+
+func TestErrors(t *testing.T) {
+	testcases := map[string]struct {
+		request        *securityapi.PodSecurityPolicyReview
+		sccs           []*kapi.SecurityContextConstraints
+		serviceAccount *kapi.ServiceAccount
+		errorMessage   string
+	}{
+		"invalid PSPR": {
+			request: &securityapi.PodSecurityPolicyReview{
+				Spec: securityapi.PodSecurityPolicyReviewSpec{
+					Template: kapi.PodTemplateSpec{
+						Spec: kapi.PodSpec{
+							Containers:         []kapi.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+							RestartPolicy:      kapi.RestartPolicyAlways,
+							SecurityContext:    &kapi.PodSecurityContext{},
+							DNSPolicy:          kapi.DNSClusterFirst,
+							ServiceAccountName: "A.B.C.D.E",
+						},
+					},
+				},
+			},
+			serviceAccount: admissionttesting.CreateSAForTest(),
+			errorMessage:   "podsecuritypolicyreview \"\" is invalid: spec.podSpec.serviceAccountName: Invalid value: \"A.B.C.D.E\": must match the regex [a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)* (e.g. 'example.com')",
+		},
+		"no SA": {
+			request: &securityapi.PodSecurityPolicyReview{
+				Spec: securityapi.PodSecurityPolicyReviewSpec{
+					Template: kapi.PodTemplateSpec{
+						Spec: kapi.PodSpec{
+							Containers:         []kapi.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+							RestartPolicy:      kapi.RestartPolicyAlways,
+							SecurityContext:    &kapi.PodSecurityContext{},
+							DNSPolicy:          kapi.DNSClusterFirst,
+							ServiceAccountName: "default",
+						},
+					},
+				},
+			},
+			errorMessage: "unable to retrieve ServiceAccount default: ServiceAccount \"default\" not found",
+		},
+	}
+	for testName, testcase := range testcases {
+		cache := &oscache.IndexerToSecurityContextConstraintsLister{
+			Indexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc,
+				cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}),
+		}
+		for _, scc := range testcase.sccs {
+			if err := cache.Add(scc); err != nil {
+				t.Fatalf("error adding sccs to store: %v", err)
+			}
+		}
+		namespace := admissionttesting.CreateNamespaceForTest()
+		var csf clientset.Interface
+		if testcase.serviceAccount != nil {
+			testcase.serviceAccount.Namespace = namespace.Name
+			csf = clientsetfake.NewSimpleClientset(namespace, testcase.serviceAccount)
+		} else {
+			csf = clientsetfake.NewSimpleClientset(namespace)
+		}
+		storage := REST{oscc.NewDefaultSCCMatcher(cache), csf}
+		ctx := kapi.WithNamespace(kapi.NewContext(), namespace.Name)
+		_, err := storage.Create(ctx, testcase.request)
+		if err == nil {
+			t.Errorf("%s - Expected error", testName)
+			continue
+		}
+		if err.Error() != testcase.errorMessage {
+			t.Errorf("%s - Bad error. Expected %q got %q", testName, testcase.errorMessage, err.Error())
+		}
+	}
+}
+
+func TestSpecificSAs(t *testing.T) {
+	testcases := map[string]struct {
+		request         *securityapi.PodSecurityPolicyReview
+		sccs            []*kapi.SecurityContextConstraints
+		errorMessage    string
+		serviceAccounts []*kapi.ServiceAccount
+	}{
+		"SAs in PSPR": {
+			request: &securityapi.PodSecurityPolicyReview{
+				Spec: securityapi.PodSecurityPolicyReviewSpec{
+					Template: kapi.PodTemplateSpec{
+						Spec: kapi.PodSpec{
+							Containers: []kapi.Container{
+								{
+									Name:            "ctr",
+									Image:           "image",
+									ImagePullPolicy: "IfNotPresent",
+								},
+							},
+							RestartPolicy:      kapi.RestartPolicyAlways,
+							SecurityContext:    &kapi.PodSecurityContext{},
+							DNSPolicy:          kapi.DNSClusterFirst,
+							ServiceAccountName: "default",
+						},
+					},
+					ServiceAccountNames: []string{"my-sa", "yours-sa"},
+				},
+			},
+			sccs: []*kapi.SecurityContextConstraints{
+				{
+					ObjectMeta: kapi.ObjectMeta{
+						SelfLink: "/api/version/securitycontextconstraints/myscc",
+						Name:     "myscc",
+					},
+					RunAsUser: kapi.RunAsUserStrategyOptions{
+						Type: kapi.RunAsUserStrategyMustRunAsRange,
+					},
+					SELinuxContext: kapi.SELinuxContextStrategyOptions{
+						Type: kapi.SELinuxStrategyMustRunAs,
+					},
+					FSGroup: kapi.FSGroupStrategyOptions{
+						Type: kapi.FSGroupStrategyMustRunAs,
+					},
+					SupplementalGroups: kapi.SupplementalGroupsStrategyOptions{
+						Type: kapi.SupplementalGroupsStrategyMustRunAs,
+					},
+					Groups: []string{"system:serviceaccounts"},
+				},
+			},
+			serviceAccounts: []*kapi.ServiceAccount{
+				&kapi.ServiceAccount{
+					ObjectMeta: kapi.ObjectMeta{
+						Name:      "my-sa",
+						Namespace: "default",
+					},
+				},
+				&kapi.ServiceAccount{
+					ObjectMeta: kapi.ObjectMeta{
+						Name:      "yours-sa",
+						Namespace: "default",
+					},
+				},
+				&kapi.ServiceAccount{
+					ObjectMeta: kapi.ObjectMeta{
+						Name:      "our-sa",
+						Namespace: "default",
+					},
+				},
+			},
+			errorMessage: "",
+		},
+		"bad SAs in PSPR": {
+			request: &securityapi.PodSecurityPolicyReview{
+				Spec: securityapi.PodSecurityPolicyReviewSpec{
+					Template: kapi.PodTemplateSpec{
+						Spec: kapi.PodSpec{
+							Containers: []kapi.Container{
+								{
+									Name:            "ctr",
+									Image:           "image",
+									ImagePullPolicy: "IfNotPresent",
+								},
+							},
+							RestartPolicy:      kapi.RestartPolicyAlways,
+							SecurityContext:    &kapi.PodSecurityContext{},
+							DNSPolicy:          kapi.DNSClusterFirst,
+							ServiceAccountName: "default",
+						},
+					},
+					ServiceAccountNames: []string{"bad-sa"},
+				},
+			},
+			sccs: []*kapi.SecurityContextConstraints{
+				{
+					ObjectMeta: kapi.ObjectMeta{
+						SelfLink: "/api/version/securitycontextconstraints/myscc",
+						Name:     "myscc",
+					},
+					RunAsUser: kapi.RunAsUserStrategyOptions{
+						Type: kapi.RunAsUserStrategyMustRunAsRange,
+					},
+					SELinuxContext: kapi.SELinuxContextStrategyOptions{
+						Type: kapi.SELinuxStrategyMustRunAs,
+					},
+					FSGroup: kapi.FSGroupStrategyOptions{
+						Type: kapi.FSGroupStrategyMustRunAs,
+					},
+					SupplementalGroups: kapi.SupplementalGroupsStrategyOptions{
+						Type: kapi.SupplementalGroupsStrategyMustRunAs,
+					},
+					Groups: []string{"system:serviceaccounts"},
+				},
+			},
+			serviceAccounts: []*kapi.ServiceAccount{
+				&kapi.ServiceAccount{
+					ObjectMeta: kapi.ObjectMeta{
+						Name:      "my-sa",
+						Namespace: "default",
+					},
+				},
+			},
+			errorMessage: `unable to retrieve ServiceAccount bad-sa: ServiceAccount "bad-sa" not found`,
+		},
+	}
+
+	for testName, testcase := range testcases {
+		cache := &oscache.IndexerToSecurityContextConstraintsLister{
+			Indexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc,
+				cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}),
+		}
+		for _, scc := range testcase.sccs {
+			if err := cache.Add(scc); err != nil {
+				t.Fatalf("error adding sccs to store: %v", err)
+			}
+		}
+		objects := []runtime.Object{}
+		namespace := admissionttesting.CreateNamespaceForTest()
+		objects = append(objects, namespace)
+		for i := range testcase.serviceAccounts {
+			objects = append(objects, testcase.serviceAccounts[i])
+		}
+		csf := clientsetfake.NewSimpleClientset(objects...)
+		storage := REST{oscc.NewDefaultSCCMatcher(cache), csf}
+		ctx := kapi.WithNamespace(kapi.NewContext(), namespace.Name)
+		_, err := storage.Create(ctx, testcase.request)
+		switch {
+		case err == nil && len(testcase.errorMessage) == 0:
+			continue
+		case err == nil && len(testcase.errorMessage) > 0:
+			t.Errorf("%s - Expected error %q. No error found", testName, testcase.errorMessage)
+			continue
+		case err.Error() != testcase.errorMessage:
+			t.Errorf("%s - Expected error %q. But got %q", testName, testcase.errorMessage, err.Error())
 		}
 	}
 }
