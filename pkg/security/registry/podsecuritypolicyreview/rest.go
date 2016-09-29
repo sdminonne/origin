@@ -43,7 +43,7 @@ func (r *REST) Create(ctx kapi.Context, obj runtime.Object) (runtime.Object, err
 		return nil, kapierrors.NewBadRequest(fmt.Sprintf("not a PodSecurityPolicyReview: %#v", obj))
 	}
 	if errs := securityvalidation.ValidatePodSecurityPolicyReview(pspr); len(errs) > 0 {
-		return nil, kapierrors.NewInvalid(kapi.Kind("podsecuritypolicyreview"), "", errs)
+		return nil, kapierrors.NewInvalid(securityapi.Kind(pspr.Kind), "", errs)
 	}
 	ns, ok := kapi.NamespaceFrom(ctx)
 	if !ok {
@@ -56,7 +56,7 @@ func (r *REST) Create(ctx kapi.Context, obj runtime.Object) (runtime.Object, err
 
 	if len(serviceAccounts) == 0 {
 		glog.Errorf("No service accounts for namespace %s", ns)
-		return nil, kapierrors.NewBadRequest(fmt.Sprintf("no a ServiceAccount for namespace: %s", ns))
+		return nil, kapierrors.NewBadRequest(fmt.Sprintf("unable to find ServiceAccount for namespace: %s", ns))
 	}
 
 	errs := []error{}

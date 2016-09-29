@@ -178,7 +178,7 @@ func TestErrors(t *testing.T) {
 				},
 			},
 			serviceAccount: admissionttesting.CreateSAForTest(),
-			errorMessage:   "podsecuritypolicyreview \"\" is invalid: spec.podSpec.serviceAccountName: Invalid value: \"A.B.C.D.E\": must match the regex [a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)* (e.g. 'example.com')",
+			errorMessage:   ` "" is invalid: spec.podSpec.serviceAccountName: Invalid value: "A.B.C.D.E": must match the regex [a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)* (e.g. 'example.com')`,
 		},
 		"no SA": {
 			request: &securityapi.PodSecurityPolicyReview{
@@ -194,7 +194,7 @@ func TestErrors(t *testing.T) {
 					},
 				},
 			},
-			errorMessage: "unable to retrieve ServiceAccount default: ServiceAccount \"default\" not found",
+			errorMessage: `unable to retrieve ServiceAccount default: ServiceAccount "default" not found`,
 		},
 	}
 	for testName, testcase := range testcases {

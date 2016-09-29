@@ -49,7 +49,7 @@ func (r *REST) Create(ctx kapi.Context, obj runtime.Object) (runtime.Object, err
 	}
 
 	if errs := securityvalidation.ValidatePodSecurityPolicySubjectReview(pspsr); len(errs) > 0 {
-		return nil, kapierrors.NewInvalid(kapi.Kind("podsecuritypolicysubjectreview"), "", errs)
+		return nil, kapierrors.NewInvalid(securityapi.Kind(pspsr.Kind), "", errs)
 	}
 
 	userInfo := &user.DefaultInfo{Name: pspsr.Spec.User, Groups: pspsr.Spec.Groups}
