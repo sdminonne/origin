@@ -8,27 +8,34 @@ import (
 
 	kapi "k8s.io/kubernetes/pkg/api"
 	kapierrors "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/auth/user"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/runtime"
 	kscc "k8s.io/kubernetes/pkg/securitycontextconstraints"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	kerrors "k8s.io/kubernetes/pkg/util/errors"
 
+	authorizationapi "github.com/openshift/origin/pkg/authorization/api"
+	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
 	securityapi "github.com/openshift/origin/pkg/security/api"
 	securityvalidation "github.com/openshift/origin/pkg/security/api/validation"
 	"github.com/openshift/origin/pkg/security/registry/podsecuritypolicysubjectreview"
 	oscc "github.com/openshift/origin/pkg/security/scc"
+	userapi "github.com/openshift/origin/pkg/user/api"
+	uservalidation "github.com/openshift/origin/pkg/user/api/validation"
+	usercache "github.com/openshift/origin/pkg/user/cache"
 )
 
 // REST implements the RESTStorage interface in terms of an Registry.
 type REST struct {
 	sccMatcher oscc.SCCMatcher
+	groupCache *usercache.GroupCache
 	client     clientset.Interface
 }
 
 // NewREST creates a new REST for policies..
-func NewREST(m oscc.SCCMatcher, c clientset.Interface) *REST {
-	return &REST{sccMatcher: m, client: c}
+func NewREST(m oscc.SCCMatcher, g *usercache.GroupCache, c clientset.Interface) *REST {
+	return &REST{sccMatcher: m, groupCache: g, client: c}
 }
 
 // New creates a new PodSecurityPolicyReview object
@@ -62,7 +69,51 @@ func (r *REST) Create(ctx kapi.Context, obj runtime.Object) (runtime.Object, err
 	errs := []error{}
 	newStatus := securityapi.PodSecurityPolicyReviewStatus{}
 	for _, sa := range serviceAccounts {
-		userInfo := serviceaccount.UserInfo(ns, sa.Name, "")
+		//userInfo := serviceaccount.UserInfo(ns, sa.Name, "")
+		username := serviceaccount.MakeUsername(ns, sa.Name)
+		groups := []string{}
+		subjects := authorizationapi.BuildSubjects([]string{username}, groups,
+			// validates whether the usernames are regular users or system users
+			uservalidation.ValidateUserName,
+			// validates group names are regular groups or system groups
+			uservalidation.ValidateGroupName)
+		for _, subject := range subjects {
+			switch subject.GetObjectKind().GroupVersionKind().GroupKind() {
+			case userapi.Kind(authorizationapi.GroupKind):
+				groups = append(groups, subject.Name)
+
+			case userapi.Kind(authorizationapi.SystemGroupKind):
+				groups = append(groups, subject.Name)
+
+			case userapi.Kind(authorizationapi.UserKind):
+				username = subject.Name
+				if actualGroups, err := r.groupCache.GroupsFor(subject.Name); err == nil {
+					for _, group := range actualGroups {
+						groups = append(groups, group.Name)
+					}
+				}
+				groups = append(groups, bootstrappolicy.AuthenticatedGroup, bootstrappolicy.AuthenticatedOAuthGroup)
+
+			case userapi.Kind(authorizationapi.SystemUserKind):
+				username = subject.Name
+				if subject.Name == bootstrappolicy.UnauthenticatedUsername {
+					groups = append(groups, bootstrappolicy.UnauthenticatedGroup)
+				} else {
+					groups = append(groups, bootstrappolicy.AuthenticatedGroup)
+				}
+
+			case kapi.Kind(authorizationapi.ServiceAccountKind):
+				username = serviceaccount.MakeUsername(subject.Namespace, subject.Name)
+				groups = append(serviceaccount.MakeGroupNames(subject.Namespace, subject.Name), bootstrappolicy.AuthenticatedGroup)
+
+			default:
+				return nil, kapierrors.NewBadRequest(fmt.Sprintf("unknown subject type: %v", subject))
+			}
+			groups = append(groups, bootstrappolicy.AuthenticatedGroup, bootstrappolicy.AuthenticatedOAuthGroup)
+		}
+
+		userInfo := &user.DefaultInfo{Name: username, Groups: groups}
+
 		saConstraints, err := r.sccMatcher.FindApplicableSCCs(userInfo)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("unable to find SecurityContextConstraints for ServiceAccount %s: %v", sa.Name, err))

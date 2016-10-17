@@ -9,12 +9,37 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	clientsetfake "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/watch"
 
 	oscache "github.com/openshift/origin/pkg/client/cache"
 	admissionttesting "github.com/openshift/origin/pkg/security/admission/testing"
 	securityapi "github.com/openshift/origin/pkg/security/api"
 	oscc "github.com/openshift/origin/pkg/security/scc"
+	userapi "github.com/openshift/origin/pkg/user/api"
+	usercache "github.com/openshift/origin/pkg/user/cache"
 )
+
+type groupCache struct {
+}
+
+func (*groupCache) ListGroups(ctx kapi.Context, options *kapi.ListOptions) (*userapi.GroupList, error) {
+	return &userapi.GroupList{}, nil
+}
+func (*groupCache) GetGroup(ctx kapi.Context, name string) (*userapi.Group, error) {
+	return nil, nil
+}
+func (*groupCache) CreateGroup(ctx kapi.Context, group *userapi.Group) (*userapi.Group, error) {
+	return nil, nil
+}
+func (*groupCache) UpdateGroup(ctx kapi.Context, group *userapi.Group) (*userapi.Group, error) {
+	return nil, nil
+}
+func (*groupCache) DeleteGroup(ctx kapi.Context, name string) error {
+	return nil
+}
+func (*groupCache) WatchGroups(ctx kapi.Context, options *kapi.ListOptions) (watch.Interface, error) {
+	return watch.NewFake(), nil
+}
 
 func TestNoErrors(t *testing.T) {
 	var uid int64 = 999
@@ -133,8 +158,9 @@ func TestNoErrors(t *testing.T) {
 		namespace := admissionttesting.CreateNamespaceForTest()
 		serviceAccount := admissionttesting.CreateSAForTest()
 		serviceAccount.Namespace = namespace.Name
+		groupCache := usercache.NewGroupCache(&groupCache{})
 		csf := clientsetfake.NewSimpleClientset(namespace, serviceAccount)
-		storage := REST{oscc.NewDefaultSCCMatcher(cache), csf}
+		storage := REST{oscc.NewDefaultSCCMatcher(cache), groupCache, csf}
 		ctx := kapi.WithNamespace(kapi.NewContext(), namespace.Name)
 		obj, err := storage.Create(ctx, testcase.request)
 		if err != nil {
@@ -215,7 +241,8 @@ func TestErrors(t *testing.T) {
 		} else {
 			csf = clientsetfake.NewSimpleClientset(namespace)
 		}
-		storage := REST{oscc.NewDefaultSCCMatcher(cache), csf}
+		groupCache := usercache.NewGroupCache(&groupCache{})
+		storage := REST{oscc.NewDefaultSCCMatcher(cache), groupCache, csf}
 		ctx := kapi.WithNamespace(kapi.NewContext(), namespace.Name)
 		_, err := storage.Create(ctx, testcase.request)
 		if err == nil {
@@ -370,7 +397,8 @@ func TestSpecificSAs(t *testing.T) {
 			objects = append(objects, testcase.serviceAccounts[i])
 		}
 		csf := clientsetfake.NewSimpleClientset(objects...)
-		storage := REST{oscc.NewDefaultSCCMatcher(cache), csf}
+		groupCache := usercache.NewGroupCache(&groupCache{})
+		storage := REST{oscc.NewDefaultSCCMatcher(cache), groupCache, csf}
 		ctx := kapi.WithNamespace(kapi.NewContext(), namespace.Name)
 		_, err := storage.Create(ctx, testcase.request)
 		switch {
