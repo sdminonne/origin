@@ -11,7 +11,6 @@ import (
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/sets"
-	// uservalidation "github.com/openshift/origin/pkg/user/api/validation"
 )
 
 // NormalizeResources expands all resource groups and forces all resources to lower case.

@@ -1,6 +1,7 @@
 package podsecuritypolicysubjectreview
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 
@@ -8,17 +9,20 @@ import (
 
 	kapi "k8s.io/kubernetes/pkg/api"
 	kapierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/runtime"
 	kscc "k8s.io/kubernetes/pkg/securitycontextconstraints"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 
-	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
+	authorizationapi "github.com/openshift/origin/pkg/authorization/api"
+	authorizer "github.com/openshift/origin/pkg/authorization/authorizer"
+	"github.com/openshift/origin/pkg/authorization/authorizer/scope"
 	securityapi "github.com/openshift/origin/pkg/security/api"
 	securityvalidation "github.com/openshift/origin/pkg/security/api/validation"
 	oscc "github.com/openshift/origin/pkg/security/scc"
+	uservalidation "github.com/openshift/origin/pkg/user/api/validation"
 	usercache "github.com/openshift/origin/pkg/user/cache"
 )
 
@@ -26,12 +30,13 @@ import (
 type REST struct {
 	sccMatcher oscc.SCCMatcher
 	groupCache *usercache.GroupCache
+	authorizer authorizer.Authorizer
 	client     clientset.Interface
 }
 
 // NewREST creates a new REST for policies..
-func NewREST(m oscc.SCCMatcher, g *usercache.GroupCache, c clientset.Interface) *REST {
-	return &REST{sccMatcher: m, groupCache: g, client: c}
+func NewREST(m oscc.SCCMatcher, g *usercache.GroupCache, a authorizer.Authorizer, c clientset.Interface) *REST {
+	return &REST{sccMatcher: m, groupCache: g, authorizer: a, client: c}
 }
 
 // New creates a new PodSecurityPolicySubjectReview object
@@ -52,20 +57,24 @@ func (r *REST) Create(ctx kapi.Context, obj runtime.Object) (runtime.Object, err
 	if errs := securityvalidation.ValidatePodSecurityPolicySubjectReview(pspsr); len(errs) > 0 {
 		return nil, kapierrors.NewInvalid(kapi.Kind("PodSecurityPolicySubjectReview"), "", errs)
 	}
-	groups := pspsr.Spec.Groups
+	//username := serviceaccount.MakeUsername(ns, pspsr.Spec.User)
+	subjects := authorizationapi.BuildSubjects([]string{pspsr.Spec.User}, pspsr.Spec.Groups,
+		// validates whether the usernames are regular users or system users
+		uservalidation.ValidateUserName,
+		// validates group names are regular groups or system groups
+		uservalidation.ValidateGroupName)
 
-	if len(groups) == 0 {
-		if actualGroups, err := r.groupCache.GroupsFor(pspsr.Spec.User); err == nil {
-			for _, group := range actualGroups {
-				groups = append(groups, group.Name)
-			}
-		}
-		groups = append(groups, bootstrappolicy.AuthenticatedGroup, bootstrappolicy.AuthenticatedOAuthGroup)
+	groupsSpecified := pspsr.Spec.Groups != nil
+	authorizationScopes := []string{scope.UserFull} // TODO: double check this
+	userInfo, attributes, err := authorizer.ComputeActingUser(subjects, groupsSpecified, authorizationScopes, ctx, r.groupCache, r.authorizer)
+	if err != nil {
+		forbiddenError := kapierrors.NewForbidden(unversioned.GroupResource{Group: attributes.GetAPIGroup(), Resource: attributes.GetAPIGroup()}, attributes.GetResourceName(), errors.New("") /*discarded*/)
+		forbiddenError.ErrStatus.Message = err.Error()
+		return nil, forbiddenError
 	}
-
-	userInfo := &user.DefaultInfo{Name: pspsr.Spec.User, Groups: groups}
 	matchedConstraints, err := r.sccMatcher.FindApplicableSCCs(userInfo)
 	if err != nil {
+
 		return nil, kapierrors.NewBadRequest(fmt.Sprintf("unable to find SecurityContextConstraints: %v", err))
 	}
 	saName := pspsr.Spec.Template.Spec.ServiceAccountName

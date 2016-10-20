@@ -2,13 +2,19 @@ package authorizer
 
 import (
 	"errors"
+	"fmt"
 
 	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 	kerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/sets"
 
+	authorizationapi "github.com/openshift/origin/pkg/authorization/api"
 	"github.com/openshift/origin/pkg/authorization/rulevalidation"
+	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
+	userapi "github.com/openshift/origin/pkg/user/api"
+	usercache "github.com/openshift/origin/pkg/user/cache"
 )
 
 type openshiftAuthorizer struct {
@@ -157,4 +163,92 @@ func doesApplyToUser(ruleUsers, ruleGroups sets.String, user user.Info) bool {
 	}
 
 	return false
+}
+
+// ComputeActingUser fills a user.Info data structure for acting-as scenario
+func ComputeActingUser(subjects []kapi.ObjectReference, groupsSpecified bool, authorizationScopes []string, ctx kapi.Context, groupCache *usercache.GroupCache, auth Authorizer) (*user.DefaultInfo, *DefaultAuthorizationAttributes, error) {
+	// make sure we're allowed to impersonate each subject.  While we're iterating through, start building username
+	// and group information
+	username := ""
+	groups := []string{}
+	for _, subject := range subjects {
+		actingAsAttributes := &DefaultAuthorizationAttributes{
+			Verb: "impersonate",
+		}
+
+		switch subject.GetObjectKind().GroupVersionKind().GroupKind() {
+		case userapi.Kind(authorizationapi.GroupKind):
+			actingAsAttributes.APIGroup = userapi.GroupName
+			actingAsAttributes.Resource = authorizationapi.GroupResource
+			actingAsAttributes.ResourceName = subject.Name
+			groups = append(groups, subject.Name)
+
+		case userapi.Kind(authorizationapi.SystemGroupKind):
+			actingAsAttributes.APIGroup = userapi.GroupName
+			actingAsAttributes.Resource = authorizationapi.SystemGroupResource
+			actingAsAttributes.ResourceName = subject.Name
+			groups = append(groups, subject.Name)
+
+		case userapi.Kind(authorizationapi.UserKind):
+			actingAsAttributes.APIGroup = userapi.GroupName
+			actingAsAttributes.Resource = authorizationapi.UserResource
+			actingAsAttributes.ResourceName = subject.Name
+			username = subject.Name
+			if !groupsSpecified {
+				if actualGroups, err := groupCache.GroupsFor(subject.Name); err == nil {
+					for _, group := range actualGroups {
+						groups = append(groups, group.Name)
+					}
+				}
+				groups = append(groups, bootstrappolicy.AuthenticatedGroup, bootstrappolicy.AuthenticatedOAuthGroup)
+			}
+
+		case userapi.Kind(authorizationapi.SystemUserKind):
+			actingAsAttributes.APIGroup = userapi.GroupName
+			actingAsAttributes.Resource = authorizationapi.SystemUserResource
+			actingAsAttributes.ResourceName = subject.Name
+			username = subject.Name
+			if !groupsSpecified {
+				if subject.Name == bootstrappolicy.UnauthenticatedUsername {
+					groups = append(groups, bootstrappolicy.UnauthenticatedGroup)
+				} else {
+					groups = append(groups, bootstrappolicy.AuthenticatedGroup)
+				}
+			}
+
+		case kapi.Kind(authorizationapi.ServiceAccountKind):
+			actingAsAttributes.APIGroup = kapi.GroupName
+			actingAsAttributes.Resource = authorizationapi.ServiceAccountResource
+			actingAsAttributes.ResourceName = subject.Name
+			username = serviceaccount.MakeUsername(subject.Namespace, subject.Name)
+			if !groupsSpecified {
+				groups = append(serviceaccount.MakeGroupNames(subject.Namespace, subject.Name), bootstrappolicy.AuthenticatedGroup)
+			}
+
+		default:
+			return nil, actingAsAttributes, fmt.Errorf("unknown subject type: %v", subject)
+		}
+
+		authCheckCtx := kapi.WithNamespace(ctx, subject.Namespace)
+		allowed, reason, err := auth.Authorize(authCheckCtx, actingAsAttributes)
+		if err != nil {
+			return nil, actingAsAttributes, err
+		}
+
+		if !allowed {
+			return nil, actingAsAttributes, errors.New(reason)
+		}
+	}
+
+	var extra map[string][]string
+	if len(authorizationScopes) > 0 {
+		extra = map[string][]string{authorizationapi.ScopesKey: authorizationScopes}
+	}
+
+	return &user.DefaultInfo{
+		Name:   username,
+		Groups: groups,
+		Extra:  extra,
+	}, nil, nil
+
 }

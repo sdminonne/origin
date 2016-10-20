@@ -4,10 +4,13 @@ import (
 	"testing"
 
 	kapi "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientsetfake "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 
+	"github.com/openshift/origin/pkg/authorization/authorizer"
 	oscache "github.com/openshift/origin/pkg/client/cache"
 	admissionttesting "github.com/openshift/origin/pkg/security/admission/testing"
 	securityapi "github.com/openshift/origin/pkg/security/api"
@@ -38,6 +41,22 @@ func (*groupCache) WatchGroups(ctx kapi.Context, options *kapi.ListOptions) (wat
 	return watch.NewFake(), nil
 }
 
+type testAuthorizer struct {
+	allowed bool
+	reason  string
+	err     string
+
+	actualAttributes authorizer.DefaultAuthorizationAttributes
+	actualUserInfo   user.Info
+}
+
+func (a *testAuthorizer) Authorize(ctx kapi.Context, passedAttributes authorizer.Action) (allowed bool, reason string, err error) {
+	a.actualUserInfo, _ = kapi.UserFrom(ctx)
+	return true, "", nil
+}
+func (a *testAuthorizer) GetAllowedSubjects(ctx kapi.Context, passedAttributes authorizer.Action) (sets.String, sets.String, error) {
+	return sets.String{}, sets.String{}, nil
+}
 func saSCC() *kapi.SecurityContextConstraints {
 	return &kapi.SecurityContextConstraints{
 		ObjectMeta: kapi.ObjectMeta{
@@ -148,9 +167,12 @@ func TestAllowed(t *testing.T) {
 		}
 
 		groupCache := usercache.NewGroupCache(&groupCache{})
+		authorizer := &testAuthorizer{
+			allowed: true,
+		}
 		csf := clientsetfake.NewSimpleClientset(namespace, serviceAccount)
-		storage := REST{oscc.NewDefaultSCCMatcher(cache), groupCache, csf}
-		ctx := kapi.WithNamespace(kapi.NewContext(), kapi.NamespaceAll)
+		storage := REST{oscc.NewDefaultSCCMatcher(cache), groupCache, authorizer, csf}
+		ctx := kapi.WithNamespace(kapi.NewContext(), "default")
 		obj, err := storage.Create(ctx, reviewRequest)
 		if err != nil {
 			t.Errorf("%s - Unexpected error: %v", testName, err)
@@ -261,9 +283,11 @@ func TestRequests(t *testing.T) {
 		}
 		csf := clientsetfake.NewSimpleClientset(namespace, serviceAccount)
 		groupCache := usercache.NewGroupCache(&groupCache{})
-
-		storage := REST{oscc.NewDefaultSCCMatcher(sccCache), groupCache, csf}
-		ctx := kapi.WithNamespace(kapi.NewContext(), kapi.NamespaceAll)
+		authorizer := &testAuthorizer{
+			allowed: false,
+		}
+		storage := REST{oscc.NewDefaultSCCMatcher(sccCache), groupCache, authorizer, csf}
+		ctx := kapi.WithNamespace(kapi.NewContext(), "default")
 		_, err := storage.Create(ctx, testcase.request)
 		switch {
 		case err == nil && len(testcase.errorMessage) == 0:
