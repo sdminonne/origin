@@ -32,7 +32,7 @@ var (
 	`)
 	reviewExamples = templates.Examples(`# Check whether Service Accounts sa1 and sa2 can admit a Pod with TemplatePodSpec specified in my_resource.yaml
 	# Service Account specified in myresource.yaml file is ignored
-	$ %[1]s -s sa1,sa2 -f my_resource.yaml
+	$ %[1]s -z sa1,sa2 -f my_resource.yaml
 	
 	# Check whether Service Account specified in my_resource_with_sa.yaml can admit the Pod
 	$ %[1]s -f my_resource_with_sa.yaml
@@ -70,7 +70,7 @@ func NewCmdSccReview(name, fullName string, f *clientcmd.Factory, out io.Writer)
 		},
 	}
 
-	cmd.Flags().StringSliceVarP(&o.ServiceAccountNames, "serviceaccounts", "s", o.ServiceAccountNames, "List of ServiceAccount names, comma separated")
+	cmd.Flags().StringSliceVarP(&o.ServiceAccountNames, "serviceaccount", "z", o.ServiceAccountNames, "service account in the current namespace to use as a user")
 	kcmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "Filename, directory, or URL to a file identifying the resource to get from a server.")
 
 	kcmdutil.AddPrinterFlags(cmd)
